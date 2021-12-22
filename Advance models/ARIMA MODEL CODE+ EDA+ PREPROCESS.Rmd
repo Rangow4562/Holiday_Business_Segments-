@@ -1,0 +1,473 @@
+![](pic3.png)
+
+# BUSINESS FORECASTING
+
+## TEAM 2
+
+#### GROUP MEMBERS
+
+MERIN GEORGE (20BDA11)
+
+ANJU MARIA RAJU (20BDA19)
+
+AADHYA SHARMA (20BDA40)
+
+CHANDAN J R (20BDA51)
+
+RANJITH KUMAR K.N (20BDA56)
+
+MARIYA BIJU (20BDA61)
+
+# PROBLEM STATEMENT
+
+Neo Bank of India (a fictional bank) receives a lot of requests for its various finance offerings that include housing loans, two-wheeler loans, real estate financing, and microloans. The number of applications received is something that varies a lot with the season. Going through these applications is a manual and tedious process.The aim of the model is to forecast daily cases for the next 1 month for 2 different business segments aggregated at the country level. 
+
+## DATA DESCRIPTION
+
+The train dataset contains variables such as 
+
+* application_date : The date application was recieved.
+* segment : The business segment.
+* branch_id : ID of the corresponding branch.
+* state : State to which branch belongs to.
+* zone : Zone to which the branch belongs to.
+
+There are a total of 77432 datapoints.
+
+# IMPORTING LIBRARIES
+```{r,warning=FALSE,results=FALSE,message=FALSE}
+library(readr)
+library(dplyr)
+library(lubridate)
+library(reshape)
+library(reshape2)
+library(tidyr)
+library(tidyverse)
+library(bizdays)
+library(timeDate)
+library(ggplot2)
+library(plotly)
+library(timeSeries)
+library(fpp2)
+library(forecast)
+library(tseries)
+library(MASS)
+library(xts)
+library(data.table)
+library(tsibble)
+library(ggfortify)
+library(fable)
+library(zoo)
+library(bizdays)
+library(ggeasy)
+library(harrypotter)
+library(bizdays)
+library(timeDate)
+library(astsa)
+```
+
+# PREPROCESSING
+```{r echo=TRUE}
+train = data.frame(read.csv("train.csv"))
+test = data.frame(read.csv("test.csv"))
+head(train)
+
+```
+
+
+
+```{r}
+head(test)
+```
+
+
+```{r}
+str(train)
+```
+
+The dataset contains 77432 datapoints and includes data of 2 business segments with branch_id,state, zone being the other variables contributing to the number of applicants.
+```{r cars}
+summary(train)
+```
+### Converting applicate date into relevant date format
+```{r}
+train$application_date<-as.Date(train$application_date,format = "%d-%m-%Y")
+test$application_date<-as.Date(test$application_date,format = "%d-%m-%Y")
+```
+
+### Converting segments to character format 
+```{r}
+train$segment<-as.character(train$segment)
+test$segment<-as.character(test$segment)
+
+```
+
+```{r}
+colSums(is.na(train))/nrow(train)*100
+```
+
+
+
+```{r echo=TRUE}
+train_1<-train[,c("segment","application_date","no_of_applicants")]
+train_2 <- setDT(train_1)[,.(No_cases = mean(no_of_applicants)), by = c("segment","application_date")]
+train_3 <- setDT(train_1)[,.(No_cases = mean(no_of_applicants)), by = c("segment","application_date")]
+```
+
+
+
+```{r}
+head(train_2)
+```
+
+```{r}
+tail(train_2)
+```
+
+### Splitting date into Day, Month, Year, Month-Year variables
+```{r}
+train_3$Day<-format(train_2$application_date,"%d")
+train_3$Month<-format(train_2$application_date,"%m")
+train_3$Year<-format(train_2$application_date,"%Y")
+train_3$MonYr = as.yearmon(train_2$application_date) #Extracting yearly
+```
+
+### Segmenting Data
+```{r}
+seg_1<-subset(train_3,train_3$segment == 1)
+seg_1$segment<-NULL
+
+seg_2<-subset(train_3,train_3$segment == 2)
+seg_2$segment<-NULL
+```
+
+```{r}
+dim(seg_1)
+dim(seg_2)
+```
+Segment 1 contains 776 datapoints and segment 2 contains 814 datapoints.
+```{r}
+head(seg_1)
+```
+
+```{r}
+tail(seg_1)
+```
+```{r}
+head(seg_2)
+
+```
+
+
+```{r}
+tail(seg_2)
+```
+
+## Tsibble dataframe for interpolated missing dates and their respective number of applicants is given as zero 
+```{r echo=TRUE}
+seg_1a<-subset(train_2,train_2$segment == 1)
+seg_1a$segment<-NULL
+
+seg_2a<-subset(train_2,train_2$segment == 2)
+seg_2a$segment<-NULL
+seg_1_ts <- as_tsibble(seg_1a,index = application_date)
+seg_2_ts <- as_tsibble(seg_2a,index = application_date)
+seg_1_ts<-fill_gaps(seg_1_ts)
+seg_1_ts<-seg_1_ts %>% replace_na(list(No_cases = 0))
+seg_1_ts
+```
+
+```{r echo=TRUE}
+
+seg_2_ts<-seg_2_ts %>% replace_na(list(No_cases = 0))
+seg_2_ts
+```
+
+
+
+## Time series dataframe
+```{r}
+seg_1_ts1 <- ts(seg_1$No_cases, start=c(2017,04,01), end=c(2019,06,05),frequency = 365)
+seg_2_ts2 <- ts (seg_2$No_cases, start =c(2017,04,01), end =c(2019,06,23),frequency=365)
+```
+
+
+
+```{r include=FALSE}
+df=train
+df$Day<-format(df$application_date,"%d")
+df$Month<-format(df$application_date,"%m")
+df$Year<-format(df$application_date,"%Y")
+df$MonYr = as.yearmon(train$application_date) #Extracting yearly
+df_segment1 = data.frame(read.csv("1.csv"))
+df_segment2 = data.frame(read.csv("2.csv"))
+
+```
+
+
+
+
+# EXPLORATORY DATA ANALYSIS
+
+## Explorartory Data Analysis For Segment 1
+```{r}
+seg_1_ts %>% autoplot(No_cases)
+
+```
+
+```{r}
+tsdata_decom <- decompose(seg_1_ts1, type = "multiplicative")
+plot(tsdata_decom)
+```
+
+
+Here we can observe a trend but seasonality is not observed.
+
+```{r}
+boxplot(seg_1_ts1,main ="Boxplot for segment 1 number of applicants")
+```
+
+The output variable contains outliers.
+
+
+```{r}
+month_summary <-df_segment1 %>% 
+                    group_by(Month) %>%
+                    summarise(No_cases= sum(no_of_applicants),.groups='drop') 
+ggplot(month_summary, 
+       aes(x = Month, 
+           y = No_cases)) +
+   geom_text(aes(label = No_cases), 
+            size = 3, 
+            position = position_stack(vjust = 0.5)) +
+  geom_bar(stat = "identity",fill = "cornflowerblue")
+```
+
+The number of applicants are higher in the months of March, May and June for segment 1.
+
+```{r}
+# no of applicants from each zone
+ggplot(data=df_segment1, aes(x=zone, fill = zone)) +
+  geom_bar() +
+  geom_text(stat='count', aes(label=..count..), vjust=-1)+
+  ggtitle("No of Applicants each zone") +
+  theme_minimal()
+```
+
+The zone east has the maximum number of applicants, with a count of more than 20000, followed by the zone south with the number of applicants amounting to 17848. 
+On the other hand, the zone north recorded a slightly less number of cases with a count of only 7760.The central zone has the lowest number of applicants with a count of 1552, as compared to the other 4 zones.There are 13024 missing values for zone.
+
+```{r}
+f<-df_segment1 %>% 
+          group_by(Year ) %>%
+          summarise(no_of_applicants= sum(no_of_applicants),.groups='drop')
+ggplot(f, 
+       aes(x = Year, 
+           y = no_of_applicants)) +
+   geom_text(aes(label = no_of_applicants), 
+            size = 3, 
+            position = position_stack(vjust = 0.5)) +
+  geom_bar(stat = "identity",fill = "maroon")
+```
+
+The year 2018 contains the most number of applicants.The count of applicants for the year 2017 and 2019 is almost the same.
+
+## Explorartory Data Analysis For Segment 2
+```{r}
+seg_2_ts %>% autoplot(No_cases)
+
+```
+
+```{r}
+tsdata_decom <- decompose(seg_2_ts2, type = "multiplicative")
+plot(tsdata_decom)
+```
+
+Trend is obseved.
+
+```{r}
+boxplot(seg_2_ts2,main ="Boxplot for segment 2 number of applicants")
+```
+
+The output variable contains no outliers.
+
+
+
+```{r}
+a<-df_segment2 %>% 
+          group_by(Month ) %>%
+          summarise(no_of_applicants= sum(no_of_applicants),.groups='drop')
+
+ggplot(a, 
+       aes(x = Month, 
+           y = no_of_applicants)) +
+   geom_text(aes(label = no_of_applicants), 
+            size = 3, 
+            position = position_stack(vjust = 0.5)) +
+  geom_bar(stat = "identity",fill = "cornflowerblue")
+```
+
+The number of applicants is higher in the months of June and March.
+
+
+
+```{r}
+b<-df_segment2 %>% 
+          group_by(Year ) %>%
+          summarise(no_of_applicants= sum(no_of_applicants),.groups='drop')
+ggplot(b, 
+       aes(x = Year, 
+           y = no_of_applicants)) +
+   geom_text(aes(label = no_of_applicants), 
+            size = 3, 
+            position = position_stack(vjust = 0.5)) +
+  geom_bar(stat = "identity",fill = "lightblue")
+
+```
+
+The year 2018 contains the most number of applicants.The count of applicants for the year 2017 and 2019 is almost the same.
+
+
+
+# MODELING
+## ARIMA - Autoregressive Integrated Moving Average
+
+The Autoregressive Integrated Moving Average (ARIMA) model uses time-series data and statistical analysis to interpret the data and make future predictions. The ARIMA model aims to explain data by using time series data on its past values and uses linear regression to make predictions.
+
+![](pic2.png)
+
+The following descriptive acronym explains the meaning of each of the key components of the ARIMA model:
+
+* The “AR” in ARIMA stands for autoregression, indicating that the model uses the dependent relationship between current data and its past values. In other words, it shows that the data is regressed on its past values.
+* The “I” stands for integrated, which means that the data is stationary. Stationary data refers to time-series data that’s been made “stationary” by subtracting the observations from the previous values.
+* The “MA” stands for moving average model, indicating that the forecast or outcome of the model depends linearly on the past values. Also, it means that the errors in forecasting are linear functions of past errors. Note that the moving average models are different from statistical moving averages.
+ 
+
+Each of the AR, I, and MA components are included in the model as a parameter. The parameters are assigned specific integer values that indicate the type of ARIMA model. A common notation for the ARIMA parameters is shown and explained below:
+
+**ARIMA (p, d, q)**
+
+* The parameter p is the number of autoregressive terms or the number of “lag observations.” It is also called the “lag order,” and it determines the outcome of the model by providing lagged data points.
+* The parameter d is known as the degree of differencing. it indicates the number of times the lagged indicators have been subtracted to make the data stationary.
+* The parameter q is the number of forecast errors in the model and is also referred to as the size of the moving average window.
+
+#### Partial Autocorrelation Correlation Function
+
+In time series analysis, the partial autocorrelation function (PACF) gives the partial correlation of a stationary time series with its own lagged values, regressed the values of the time series at all shorter lags. It contrasts with the autocorrelation function, which does not control for other lags and p (autoregression term) for ARIMA is contributed by this graph.
+
+####  AutoCorrelation Function:
+The autocorrelation function is one of the tools used to find patterns in the data. Specifically, the autocorrelation function tells you the correlation between points separated by various time lags.A plot of the autocorrelation of a time series by lag is called the AutoCorrelation Function, or the acronym ACF. This plot is sometimes called a correlogram or an autocorrelation plot.The q (moving average term) for ARIMA is contributed by this graph.
+
+## Augmented Dickey- Fuller Test(ADF)
+
+ADF test is an ‘augmented’ version of the Dickey Fuller test. The ADF test expands the Dickey-Fuller test equation to include high order regressive process in the model.It is a sophisticated approach towards finding whether a time series is stationary or not.
+
+![](pic1.png)
+
+## ARIMA Modeling for Segment 1
+### Augmented Dickey- Fuller Test
+
+
+```{r}
+adf.test(seg_1_ts1)
+```
+We accept the alternative hypothesis.Therefore, data is stationary.
+```{r}
+autoplot(seg_1_ts1)
+```
+
+
+### Partial Autocorrelation Correlation Function
+```{r}
+Pacf(seg_1_ts1,lag.max = 20)
+```
+
+The appropriate lag value is 1, since it has high PACF value and here we consider lag values that are low in magnitude to get appropriate results.
+
+### AutoCorrelation Function
+```{r}
+Acf(seg_1_ts1,lag.max=20)
+
+```
+
+The appropriate lag value is 14, since it has high ACF value and here we consider lag values that are low in magnitude to get appropriate results.
+
+### Model Summary for segment 1
+```{r}
+tsmod_seg1 <- Arima(y=seg_1_ts1, order = c(1,0,14))
+print(tsmod_seg1)
+```
+
+### Forecasted Values for segment 1 (Next 30 days)
+```{r}
+pred_data_1 = data.frame(forecast(tsmod_seg1, h= 30))
+pred_data_1$Point.Forecast
+```
+
+```{r}
+autoplot(forecast(tsmod_seg1, h= 30))
+
+```
+
+
+## ARIMA Model for Segment 2
+### Augmented Dickey- Fuller Test
+```{r}
+adf.test(seg_2_ts2)
+
+```
+
+We accept the alternative hypothesis.Therefore, data is stationary.
+
+
+### Partial Autocorrelation Correlation Function
+```{r}
+Pacf(seg_2_ts2,lag.max = 20)
+```
+
+The appropriate lag value is 1, since it has high PACF value and here we consider lag values that are low in magnitude to get appropriate results.
+
+### AutoCorrelation Function
+```{r}
+Acf(seg_2_ts2,lag.max=50)
+```
+
+
+The appropriate lag value is 1, since it has high ACF value and here we consider lag values that are low in magnitude to get appropriate results.
+
+
+### Model Summary for segment 1
+
+```{r}
+tsmod_seg2 <- Arima(y=seg_2_ts2, order = c(1,0,1))
+print(tsmod_seg2)
+```
+
+
+### Forecasted Values for segment 2 (Next 30 days)
+
+```{r}
+pred_data_2 = data.frame (forecast(tsmod_seg2, h= 30))
+no_of_applicants=c(pred_data_2$Point.Forecast,pred_data_2$Point.Forecast)
+pred_data_2$Point.Forecast
+```
+
+
+
+```{r}
+autoplot(forecast(tsmod_seg2, h= 30))
+```
+
+
+```{r include=FALSE}
+```{r eval=FALSE, include=FALSE}
+dat_ts=data.frame(read.csv("sample_submission.csv"))
+dat_ts$no_of_applicants<-round(no_of_applicants)
+write.csv(dat_ts,"15.csv",row.names = FALSE)
+
+```
+
+# RESULT
+
+Mean value for number of applicants were taken based on  date of application recieved and the respective forecasts for next 30 days were carried out for each business segment using ARIMA model.
+
